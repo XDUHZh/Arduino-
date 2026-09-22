@@ -1,0 +1,68 @@
+// Arduino + HC-SR04 示例程序
+// PC 命令：ID:学号、MEASURE、START、STOP
+// Arduino 返回：DIST:xx.xx cm
+
+const byte TRIG_PIN = 9;
+const byte ECHO_PIN = 10;
+bool continuousMode = false;
+unsigned long lastMeasureAt = 0;
+
+float readDistanceCm() {
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+
+  unsigned long duration = pulseIn(ECHO_PIN, HIGH, 30000UL);
+  if (duration == 0) return -1.0;
+  return duration * 0.0343 / 2.0;
+}
+
+void sendDistance() {
+  float distance = readDistanceCm();
+  if (distance < 0) {
+    Serial.println("ERROR:TIMEOUT");
+  } else {
+    Serial.print("DIST:");
+    Serial.print(distance, 2);
+    Serial.println(" cm");
+  }
+}
+
+void handleCommand(String command) {
+  command.trim();
+  if (command.startsWith("ID:")) {
+    Serial.print("ID_OK:");
+    Serial.println(command.substring(3));
+  } else if (command == "MEASURE") {
+    sendDistance();
+  } else if (command == "START") {
+    continuousMode = true;
+    Serial.println("START_OK");
+  } else if (command == "STOP") {
+    continuousMode = false;
+    Serial.println("STOP_OK");
+  } else if (command.length() > 0) {
+    Serial.println("ERROR:UNKNOWN_COMMAND");
+  }
+}
+
+void setup() {
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  Serial.begin(9600);
+  Serial.setTimeout(50);
+  Serial.println("READY");
+}
+
+void loop() {
+  if (Serial.available()) {
+    handleCommand(Serial.readStringUntil('\n'));
+  }
+
+  if (continuousMode && millis() - lastMeasureAt >= 500) {
+    lastMeasureAt = millis();
+    sendDistance();
+  }
+}
